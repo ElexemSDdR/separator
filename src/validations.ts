@@ -1,43 +1,36 @@
 import { readdir } from 'node:fs/promises'
-import { exit } from 'node:process'
-import { createInterface } from 'node:readline/promises'
-import { stdin as input, stdout as output } from 'node:process'
+import { stat } from 'node:fs/promises'
+import { resolve, join } from 'node:path'
+import mime from 'mime'
 
-const confirmationAction = async () => {
-  const yesOptions = ['y', 'yes']
-  const readline = createInterface({ input, output })
-
-  console.log(
-    'La carpeta de registros ya existe, correr el script de separación va a sobreescribir la carpeta.',
-  )
-
-  const answer = await readline.question(
-    '¿Vas a sobreescribir la carpeta? y/N\n',
-  )
-
-  readline.close()
-
-  const confirmed = yesOptions.includes(answer.toLowerCase().trim())
-
-  return confirmed
+export class BaseError extends Error {
+  constructor(message: string) {
+    super(message)
+  }
 }
 
-export const verifyRegistrosFolder = async () => {
-  const folders = await readdir(__dirname, {
-    encoding: 'utf-8',
-  })
+const __dirname = resolve()
 
-  const registrosExists = folders.includes(REGISTROS_FOLDER_NAME)
+export const validateBase = async (base: string): Promise<void> => {
+  const baseExists = (await readdir(__dirname)).includes(base)
+  if (!baseExists) throw new BaseError(`El archivo "${base}" no existe`)
 
-  if (!registrosExists) return
+  const isFile = await stat(join(__dirname, base))
+  const mimeType = mime.getType(join(__dirname, base))
 
-  const userConfirmation = await confirmationAction()
+  if (!isFile.isFile()) throw new BaseError('La base tiene que ser un archivo.')
+  if (mimeType !== 'text/plain')
+    throw new BaseError('La base tiene que ser un archivo .txt')
 
-  if (userConfirmation) {
-    console.info('\nEliminando la carpeta de registros anterior.')
-    return
-  }
+  return
+}
 
-  console.log('\nNo se separó el archivo')
-  exit(1)
+export const verifyRegistrosFolderExists = async (
+  registrosFolderName: string,
+): Promise<boolean> => {
+  const folders = await readdir(__dirname)
+
+  const registrosExists = folders.includes(registrosFolderName)
+
+  return registrosExists
 }
